@@ -19,7 +19,10 @@ import upload from './routes/upload.js';
 import admin from './routes/admin.js';
 import { initSocket } from './realtime.js';
 import { seed } from './seed.js';
-if (!process.env.JWT_SECRET) process.env.JWT_SECRET = 'dev_secret_change_me';
+if (!process.env.JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') throw new Error('JWT_SECRET is required in production. Set it in the backend host environment.');
+  process.env.JWT_SECRET = 'dev_secret_change_me';
+}
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
@@ -42,6 +45,7 @@ app.use((err, req, res, next) => {
 });
 // Accept the standard Atlas variable name and the legacy project name.
 let uri = process.env.MONGODB_URI || process.env.MONGO_URI; let memory = false;
+if (!uri && process.env.NODE_ENV === 'production') throw new Error('MONGODB_URI is required in production. Add your Atlas connection string to the backend host environment.');
 if (!uri) { const { MongoMemoryServer } = await import('mongodb-memory-server'); uri = (await MongoMemoryServer.create()).getUri(); memory = true; console.log('Using in-memory MongoDB'); }
 try {
   await mongoose.connect(uri, { serverSelectionTimeoutMS: 10000 });

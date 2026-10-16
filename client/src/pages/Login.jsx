@@ -1,10 +1,31 @@
 import { useState } from 'react';
-import api from '../api';
+import api, { serverOrigin } from '../api';
 import { Modal } from '../components/ui';
 import { errMsg } from '../utils';
 export default function Login({ onAuth }) {
   const [f, setF] = useState({ email: '', password: '' }); const [err, setErr] = useState(''); const [reg, setReg] = useState(false); const [busy, setBusy] = useState(false);
-  const go = async (mode, body) => { setErr(''); setBusy(true); try { const { data } = await api.post(`/auth/${mode}`, body); localStorage.setItem('token', data.token); onAuth(); } catch (x) { setErr(errMsg(x)); setBusy(false); } };
+  const go = async (mode, body) => {
+    setErr(''); setBusy(true);
+    try {
+      const { data } = await api.post(`/auth/${mode}`, body);
+      localStorage.setItem('token', data.token);
+      const loaded = await onAuth();
+      if (loaded === false) {
+        localStorage.removeItem('token');
+        setErr('Your credentials were accepted, but your profile could not load. Check the API deployment and MongoDB connection, then try again.');
+        setBusy(false);
+      }
+    } catch (x) {
+      const missingApi = !import.meta.env.DEV && !serverOrigin;
+      const missingRoute = x.response?.status === 404;
+      setErr(missingApi || missingRoute
+        ? 'The API is not connected to this Vercel site. Deploy the Express server and set VITE_API_URL to its public URL in Vercel, then redeploy.'
+        : !x.response
+          ? `Could not reach the API${serverOrigin ? ` at ${serverOrigin}` : ''}. Check the API host, CORS settings, and MongoDB connection.`
+          : errMsg(x));
+      setBusy(false);
+    }
+  };
   const set = k => e => setF({ ...f, [k]: e.target.value });
   return (<div className="login">
     <div className="login-inner">

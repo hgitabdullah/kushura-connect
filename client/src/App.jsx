@@ -26,7 +26,11 @@ export default function App() {
   const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');
   const loc = useLocation();
   useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; localStorage.setItem('theme', dark ? 'dark' : 'light'); }, [dark]);
-  const load = useCallback(() => api.get('/users/me').then(r => setMe(r.data)).catch(() => { localStorage.removeItem('token'); setMe(null); }).finally(() => setReady(true)), []);
+  const load = useCallback(async () => {
+    try { const { data } = await api.get('/users/me'); setMe(data); return true; }
+    catch { localStorage.removeItem('token'); setMe(null); return false; }
+    finally { setReady(true); }
+  }, []);
   useEffect(() => { localStorage.getItem('token') ? load() : setReady(true); }, [load]);
   useEffect(() => { if (!me?._id) return; const s = getSocket(); api.get('/online').then(r => setOnline(r.data));
     const onN = n => { if (['request', 'accept'].includes(n.type)) load(); };
