@@ -1,0 +1,16 @@
+import { Router } from 'express';
+import auth from '../middleware/auth.js';
+import Listing from '../models/Listing.js';
+import { bad, isId, U, clean } from '../utils/helpers.js';
+const r = Router();
+const esc = s => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const F = ['title', 'price', 'category', 'condition', 'location', 'description', 'images', 'sold'];
+r.param('id', (req, res, next, id) => isId(id) ? next() : bad(res, 'Invalid id'));
+r.get('/', auth, async (req, res) => { const q = {}; if (req.query.q) q.title = new RegExp(esc(req.query.q), 'i'); if (req.query.category) q.category = req.query.category; if (req.query.mine) q.seller = req.userId;
+  if (req.query.max) q.price = { $lte: +req.query.max }; res.json(await Listing.find(q).sort('-createdAt').limit(100).populate('seller', U)); });
+r.post('/', auth, async (req, res) => { const b = clean(req.body, F); if (!b.title) return bad(res, 'Title required'); if (!(+b.price >= 0)) return bad(res, 'Valid price required');
+  res.status(201).json(await (await Listing.create({ ...b, price: +b.price, seller: req.userId })).populate('seller', U)); });
+r.get('/:id', auth, async (req, res) => { const l = await Listing.findById(req.params.id).populate('seller', U + ' location createdAt'); if (!l) return bad(res, 'Listing not found', 404); res.json(l); });
+r.put('/:id', auth, async (req, res) => { const l = await Listing.findById(req.params.id); if (String(l?.seller) !== req.userId) return bad(res, 'Not your listing', 403); Object.assign(l, clean(req.body, F)); await l.save(); res.json(await l.populate('seller', U)); });
+r.delete('/:id', auth, async (req, res) => { await Listing.deleteOne({ _id: req.params.id, seller: req.userId }); res.json({ ok: true }); });
+export default r;
